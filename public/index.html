@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mail organiser</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --bg1: #f7f7f6;
+    --bg2: #ebebe9;
+    --ink: #111111;
+    --muted: #6a6a6a;
+    --line: rgba(0, 0, 0, .09);
+    --line-2: rgba(0, 0, 0, .18);
+    --glass: rgba(255, 255, 255, .66);
+    --glass-2: rgba(255, 255, 255, .9);
+    --glass-solid: #fafafa;
+    --glass-border: rgba(255, 255, 255, .85);
+    --hi: rgba(255, 255, 255, .95);
+    --field: rgba(255, 255, 255, .9);
+    --shadow: 0 8px 28px rgba(0, 0, 0, .07), 0 1px 3px rgba(0, 0, 0, .05);
+    --accent: #ff6a00;
+    --accent-2: #ff8f33;
+    --accent-deep: #e55c00;
+    --accent-ink: #1a0b00;
+    --tint: rgba(0, 0, 0, .04);
+    --unread: #ff6a00;
+    --danger: #c62828;
+    --blob1: #d8d8d5;
+    --blob2: #e6e6e3;
+    --blob3: #ffd8bc;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0b0b0b;
+      --bg1: #0b0b0b;
+      --bg2: #171717;
+      --ink: #f5f5f5;
+      --muted: #9b9b9b;
+      --line: rgba(255, 255, 255, .11);
+      --line-2: rgba(255, 255, 255, .22);
+      --glass: rgba(255, 255, 255, .05);
+      --glass-2: rgba(255, 255, 255, .09);
+      --glass-solid: #161616;
+      --glass-border: rgba(255, 255, 255, .10);
+      --hi: rgba(255, 255, 255, .08);
+      --field: rgba(255, 255, 255, .06);
+      --shadow: 0 10px 34px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4);
+      --accent: #ff7a1a;
+      --accent-2: #ffa050;
+      --accent-deep: #e8650a;
+      --tint: rgba(255, 255, 255, .05);
+      --unread: #ff7a1a;
+      --danger: #ff7b73;
+      --blob1: #2b2b2b;
+      --blob2: #1d1d1d;
+      --blob3: #5b2a08;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hidden { display: none !important; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* soft monochrome backdrop with one faint warm glow */
+  .bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .bg i { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .6; will-change: transform; animation: drift 32s ease-in-out infinite alternate; }
+  .bg i:nth-child(1) { width: 44vmax; height: 44vmax; left: -14vmax; top: -16vmax; background: var(--blob1); }
+  .bg i:nth-child(2) { width: 38vmax; height: 38vmax; right: -12vmax; top: 20vh; background: var(--blob2); animation-duration: 38s; animation-delay: -8s; }
+  .bg i:nth-child(3) { width: 30vmax; height: 30vmax; left: 34vw; bottom: -16vmax; background: var(--blob3); opacity: .45; animation-duration: 44s; animation-delay: -16s; }
+  @keyframes drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); } }
+
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow), inset 0 1px 0 var(--hi);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass { background: var(--glass-solid); }
+  }
+
+  /* ---- controls: one height scale (36 / 30 / 28) and one radius scale (10 / 14 / 18) ---- */
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
+  input, select {
+    width: 100%; height: 36px; padding: 0 12px; background: var(--field); border: 1px solid var(--line-2);
+    border-radius: 10px; font-size: 14px; transition: border-color .2s, box-shadow .2s;
+  }
+  input[type="datetime-local"] { padding: 0 10px; font-size: 13.5px; }
+  input::placeholder { color: color-mix(in srgb, var(--muted) 75%, transparent); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+  .btn {
+    height: 36px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--field);
+    font-size: 14px; font-weight: 600; white-space: nowrap;
+    transition: transform .2s var(--ease), border-color .2s, box-shadow .2s, background .2s;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--ink); transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn.primary {
+    color: var(--accent-ink); font-weight: 700; border-color: var(--accent-deep);
+    background: linear-gradient(180deg, var(--accent-2), var(--accent));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 1px 2px rgba(0, 0, 0, .2), 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .btn.primary:hover:not(:disabled) { border-color: var(--accent-deep); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 1px 2px rgba(0, 0, 0, .2), 0 10px 22px color-mix(in srgb, var(--accent) 42%, transparent); }
+  .btn.small { height: 30px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+  .btn.pill { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; }
+  .btn.pill:hover:not(:disabled), .btn.small:hover:not(:disabled) { border-color: var(--accent); }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover:not(:disabled) { border-color: var(--danger); }
+  .error { color: var(--danger); font-size: 13px; margin-top: 8px; min-height: 1.2em; }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; line-height: 1.45; }
+
+  /* switches (orange when on) */
+  .check { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 9px 0; font-size: 13.5px; font-weight: 500; color: var(--ink); cursor: pointer; border-top: 1px solid var(--line); }
+  .check:first-of-type { border-top: 0; }
+  .check input {
+    appearance: none; -webkit-appearance: none; flex: none; width: 36px; height: 22px; padding: 0; border-radius: 999px; border: 0;
+    background: color-mix(in srgb, var(--muted) 38%, transparent); position: relative; cursor: pointer; transition: background .25s var(--ease);
+  }
+  .check input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transition: transform .25s var(--ease); }
+  .check input:checked { background: linear-gradient(180deg, var(--accent-2), var(--accent)); }
+  .check input:checked::after { transform: translateX(14px); }
+
+  /* ---- sign in ---- */
+  #login { width: min(400px, calc(100% - 32px)); margin: 9vh auto; padding: 28px; border-radius: 20px; }
+  #login p { color: var(--muted); margin: 12px 0 0; font-size: 13.5px; }
+  #login .hint { font-size: 12px; }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .brand > div { min-width: 0; }
+  .logo { position: relative; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--ink); color: var(--paper); }
+  .logo::after { content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--paper); }
+  .brand strong { display: block; font-size: 15px; letter-spacing: -.01em; line-height: 1.25; }
+  .who { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row { display: grid; grid-template-columns: 1fr 84px; gap: 10px; }
+  .two { display: grid; grid-template-columns: 1fr; }   /* date fields stack so they are never clipped */
+
+  /* ---- layout ---- */
+  #app { display: grid; grid-template-columns: 308px minmax(0, 1fr); gap: 16px; padding: 16px; min-height: 100vh; align-items: start; }
+  aside {
+    position: sticky; top: 16px; height: calc(100vh - 32px); overflow-y: auto; padding: 16px; border-radius: 18px;
+    display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin;
+  }
+  aside > * { flex: none; }
+  .card { margin: 0; padding: 14px; border-radius: 14px; background: var(--glass-2); border: 1px solid var(--line); }
+  .card > h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; margin-bottom: 0; }
+  .card label:first-of-type { margin-top: 8px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .acts-row { display: flex; gap: 8px; margin-top: 12px; }
+  .acts-row .primary { flex: 1; }
+
+  details.acc { margin: 0; border-radius: 14px; background: var(--glass-2); border: 1px solid var(--line); overflow: hidden; }
+  details.acc > summary { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; font-weight: 650; font-size: 14px; cursor: pointer; list-style: none; user-select: none; }
+  details.acc > summary::-webkit-details-marker { display: none; }
+  details.acc > summary .chev { margin-left: auto; transition: transform .25s var(--ease); color: var(--muted); }
+  details.acc[open] > summary .chev { transform: rotate(90deg); }
+  details.acc > summary svg.i:first-child { color: var(--accent); }
+  details.acc .inner { padding: 0 14px 14px; }
+  details.acc .inner > label:first-child { margin-top: 2px; }
+
+  /* group and search cards: name on top, actions underneath, so nothing is squeezed */
+  .item { border: 1px solid var(--line); background: var(--field); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; transition: border-color .2s, transform .2s var(--ease); }
+  .item:hover { border-color: var(--line-2); transform: translateY(-1px); }
+  .item .top { display: block; }
+  .item .top strong { font-size: 14px; display: inline-flex; align-items: center; }
+  .item small { display: block; color: var(--muted); font-size: 12px; word-break: break-word; margin-top: 2px; line-height: 1.4; }
+  .item .acts { display: flex; gap: 6px; margin-top: 10px; }
+  .badge { display: inline-block; min-width: 20px; height: 18px; line-height: 18px; padding: 0 6px; margin-left: 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; text-align: center; }
+  .log { margin: 10px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+  .log li { padding: 6px 0; border-top: 1px solid var(--line); }
+  .live { color: var(--accent-deep); font-weight: 700; }
+
+  main { min-width: 0; padding-bottom: 40px; }
+  main > * { max-width: 980px; }
+  .toolbar { position: sticky; top: 16px; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 16px; margin-bottom: 14px; min-height: 52px; }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 11px; background: var(--tint); border: 1px solid var(--line); }
+  .tab { height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; font-size: 13px; font-weight: 600; color: var(--muted); transition: background .2s var(--ease), color .2s; }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .status { margin-left: auto; padding: 0 12px; height: 28px; line-height: 28px; border-radius: 999px; background: var(--tint); border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  .status b { color: var(--accent-deep); font-weight: 700; }
+
+  .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 14px; border-radius: 14px; background: var(--glass-2); border: 1px solid var(--line); border-left: 3px solid var(--accent); font-size: 13px; }
+  .suggest .chip { height: 28px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--field); font-size: 12.5px; font-weight: 600; transition: border-color .2s, transform .2s var(--ease); }
+  .suggest .chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+  #results { transition: opacity .25s; }
+  #results.loading { opacity: .5; pointer-events: none; }
+  .bucket { margin-bottom: 14px; border-radius: 16px; overflow: hidden; animation: rise .4s var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .bucket > header { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 46px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+  .bucket > header strong { font-size: 14px; }
+  .bucket > header .meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; }
+
+  .msg {
+    position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%;
+    padding: 10px 16px 10px 22px; text-align: left; background: transparent; border: 0; border-top: 1px solid var(--line); transition: background .15s;
+  }
+  .msg:first-of-type { border-top: 0; }
+  .msg:hover { background: var(--tint); }
+  .msg.unread::before { content: ""; position: absolute; left: 9px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--unread); }
+  /* monochrome avatars: shade varies by sender so they are easy to tell apart */
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; color: var(--paper);
+    background: color-mix(in srgb, var(--ink) calc(52% + var(--h) * .1%), var(--paper));
+  }
+  .msg .text { display: grid; gap: 1px; min-width: 0; }
+  .msg .from, .msg .subj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg .from { font-size: 14px; font-weight: 500; }
+  .msg .subj { font-size: 13px; color: var(--muted); }
+  .msg.unread .from { font-weight: 700; }
+  .msg.unread .subj { color: var(--ink); font-weight: 500; }
+  .msg .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .empty { padding: 56px 20px; text-align: center; color: var(--muted); font-size: 14px; border-radius: 16px; background: var(--glass); border: 1px dashed var(--line-2); }
+  #more { display: block; margin: 6px auto 20px; }
+
+  /* ---- priority ---- */
+  .prio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .prio .tile { padding: 12px 14px; border-radius: 14px; background: var(--glass-2); border: 1px solid var(--line); }
+  .prio .tile b { display: block; font-size: 22px; line-height: 1.2; letter-spacing: -.02em; }
+  .prio .tile span { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .prio .tile.hot { border-left: 3px solid var(--accent); }
+  .prio .tile.hot b { color: var(--accent-deep); }
+  .prio .hint { grid-column: 1 / -1; margin: 0; }
+  .msg .why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+  .msg .why::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+  .reader-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .reader-actions .hint { margin: 0; }
+
+  /* ---- reader ---- */
+  #reader { position: fixed; z-index: 20; inset: 12px 12px 12px auto; width: min(780px, calc(100% - 24px)); padding: 18px 22px 24px; overflow-y: auto; border-radius: 18px; background: var(--glass-2); animation: slide .3s var(--ease); }
+  @keyframes slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+  .r-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .r-top .seg .tab { height: 26px; padding: 0 12px; font-size: 12.5px; }
+  #reader h2 { font-size: 20px; margin: 14px 0 0; line-height: 1.3; overflow-wrap: anywhere; }
+  .r-head { display: flex; align-items: center; gap: 12px; margin: 12px 0 0; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  #rAvatar { width: 40px; height: 40px; font-size: 14px; flex: none; }
+  .r-who { min-width: 0; display: grid; }
+  .r-who strong { font-size: 14.5px; }
+  .r-who span { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reader-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .reader-actions .hint { margin: 0; }
+  .r-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 8px 12px; border-radius: 12px; background: var(--tint); border: 1px solid var(--line); border-left: 3px solid var(--accent); font-size: 12.5px; color: var(--muted); }
+  #rFrame { display: block; width: 100%; min-height: 160px; margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color-scheme: light; }
+  #rBody { margin-top: 16px; font-size: 14.5px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #rBody .lnk, .lnk { color: var(--accent-deep); font-weight: 600; text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+  #rBody .lnk:hover { background: var(--tint); }
+  .r-files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .file { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--field); font-size: 13px; font-weight: 600; transition: border-color .2s; }
+  .file:hover:not(:disabled) { border-color: var(--accent); }
+  .file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file small { color: var(--muted); font-weight: 500; font-size: 12px; }
+
+  @media (max-width: 880px) {
+    #app { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+    aside { position: static; height: auto; overflow: visible; }
+    .toolbar { top: 8px; }
+    .status { margin-left: 0; }
+    #reader { inset: 8px; width: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bg i, .bucket, #reader { animation: none; }
+    * { transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<section id="login" class="glass">
+  <div class="brand">
+    <span class="logo"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 8 8 6 8-6"/></svg></span>
+    <div><strong>Mail organiser</strong><span class="who">Find, sort and file your email</span></div>
+  </div>
+  <p>Sign in with any mailbox that supports IMAP. Your password stays in this app’s memory and is never saved.</p>
+  <label for="preset">Provider</label>
+  <select id="preset">
+    <option value="imap.gmail.com">Gmail</option>
+    <option value="outlook.office365.com">Outlook / Microsoft 365</option>
+    <option value="imap.mail.yahoo.com">Yahoo</option>
+    <option value="imap.zoho.com">Zoho</option>
+    <option value="">Other</option>
+  </select>
+  <div class="row">
+    <div><label for="host">IMAP server</label><input id="host" value="imap.gmail.com"></div>
+    <div><label for="port">Port</label><input id="port" value="993" inputmode="numeric"></div>
+  </div>
+  <label for="user">Email address</label>
+  <input id="user" type="email" autocomplete="username">
+  <label for="pass">App password</label>
+  <input id="pass" type="password" autocomplete="current-password">
+  <p class="hint">Gmail and Yahoo need an app password, not your normal one. See the README.</p>
+  <div style="margin-top:20px"><button class="btn primary" id="signin" style="width:100%">Sign in</button></div>
+  <div class="error" id="loginError" role="alert"></div>
+</section>
+
+<div id="app" class="hidden">
+  <aside class="glass">
+    <div class="brand">
+      <span class="logo"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 8 8 6 8-6"/></svg></span>
+      <div><strong>Mail organiser</strong><span class="who" id="who"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>Find emails</h3>
+
+      <label for="folder">Look in</label>
+      <select id="folder"></select>
+
+      <label for="from">From</label>
+      <input id="from" list="fromOptions" placeholder="Ama, @knust.edu.gh, Lecturers">
+      <datalist id="fromOptions"></datalist>
+      <p class="hint">People, organisations or groups. Separate several with commas.</p>
+
+      <label for="q">Contains text</label>
+      <input id="q" placeholder="Subject or message text">
+
+      <div class="two">
+        <div><label for="since">After</label><input id="since" type="datetime-local"></div>
+        <div><label for="before">Before</label><input id="before" type="datetime-local"></div>
+      </div>
+
+      <div class="quick">
+        <button class="btn small pill" data-range="1h">Last hour</button>
+        <button class="btn small pill" data-range="24h">24 hours</button>
+        <button class="btn small pill" data-range="today">Today</button>
+        <button class="btn small pill" data-range="7d">7 days</button>
+      </div>
+
+      <label class="check" style="margin-top:12px"><span>New (unread) only</span><input type="checkbox" id="unread"></label>
+      <div class="acts-row">
+        <button class="btn primary" id="search">Search</button>
+        <button class="btn" id="clear">Clear</button>
+      </div>
+      <div class="error" id="searchError" role="alert"></div>
+    </div>
+
+    <details class="acc" open>
+      <summary><svg class="i" viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg>Automatic filing<svg class="i chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></summary>
+      <div class="inner">
+        <label class="check"><span>File new mail into group folders</span><input type="checkbox" id="autoFile"></label>
+        <p class="hint">Checks every minute and files mail from your groups as it arrives. Only new mail is touched, and only while this app is running.</p>
+        <div id="autoStatus" class="hint"></div>
+        <div style="margin-top:10px"><button class="btn small hidden" id="autoRun">Check now</button></div>
+        <ul class="log" id="autoLog"></ul>
+      </div>
+    </details>
+
+    <details class="acc" open>
+      <summary><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.5M18 14.5c2 .6 3 2.2 3 4.5"/></svg>Groups<svg class="i chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></summary>
+      <div class="inner">
+        <div id="groupList"></div>
+        <label for="gName" id="gTitle">New group name</label>
+        <input id="gName" placeholder="Lecturers">
+        <label for="gMembers">Members</label>
+        <input id="gMembers" placeholder="ama@mail.com, @knust.edu.gh">
+        <p class="hint">A full address for one person, or @domain for a whole organisation.</p>
+        <div style="margin-top:10px">
+          <label class="check"><span>Take filed mail out of my inbox</span><input type="checkbox" id="gMove"></label>
+          <label class="check"><span>Mark filed mail as read</span><input type="checkbox" id="gRead"></label>
+        </div>
+        <div class="acts-row">
+          <button class="btn primary" id="addGroup">Save group</button>
+          <button class="btn hidden" id="cancelEdit">Cancel</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary><svg class="i" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></svg>Saved searches<svg class="i chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></summary>
+      <div class="inner">
+        <div id="searchList"></div>
+        <label for="sName">Name this search</label>
+        <input id="sName" placeholder="New from lecturers">
+        <div style="margin-top:10px"><button class="btn" id="saveSearch">Save search</button></div>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Settings<svg class="i chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></summary>
+      <div class="inner">
+        <label class="check"><span>Refresh results every minute</span><input type="checkbox" id="auto"></label>
+        <label class="check"><span>Mark as read when opened</span><input type="checkbox" id="markOpen"></label>
+        <label class="check"><span>Desktop alert when mail is filed</span><input type="checkbox" id="alerts"></label>
+        <p class="hint">Shortcuts: / to search by sender, r to refresh, Esc to close an email.</p>
+        <div style="margin-top:14px"><button class="btn small" id="signout">Sign out</button></div>
+      </div>
+    </details>
+  </aside>
+
+  <main>
+    <div class="toolbar glass" role="group" aria-label="Organise results">
+      <div class="seg">
+        <button class="tab" data-mode="priority" aria-pressed="true">Priority</button>
+        <button class="tab" data-mode="list" aria-pressed="false">Newest</button>
+        <button class="tab" data-mode="group" aria-pressed="false">Groups</button>
+        <button class="tab" data-mode="person" aria-pressed="false">People</button>
+        <button class="tab" data-mode="org" aria-pressed="false">Organisations</button>
+      </div>
+      <button class="btn small hidden" id="fileBtn">File into group folders</button>
+      <button class="btn small hidden" id="csvBtn">Export CSV</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+    <div id="prio" class="prio hidden"></div>
+    <div id="suggest" class="suggest hidden"></div>
+    <div id="results"><div class="empty">Choose your filters and select Search.</div></div>
+    <button class="btn hidden" id="more">Load 100 more</button>
+  </main>
+</div>
+
+<div id="reader" class="hidden glass" role="dialog" aria-label="Message">
+  <div class="r-top">
+    <button class="btn small" id="closeReader">Close</button>
+    <div class="seg hidden" id="rView">
+      <button class="tab" data-view="formatted" aria-pressed="true">Formatted</button>
+      <button class="tab" data-view="text" aria-pressed="false">Text</button>
+    </div>
+  </div>
+  <h2 id="rSubject"></h2>
+  <div class="r-head">
+    <span class="avatar" id="rAvatar"></span>
+    <div class="r-who"><strong id="rFrom"></strong><span id="rMeta"></span></div>
+  </div>
+  <div class="reader-actions hidden" id="rActions">
+    <button class="btn small" id="rImportant">Always important</button>
+    <button class="btn small" id="rNoise">Treat as noise</button>
+    <span class="hint" id="rNote"></span>
+  </div>
+  <div class="r-banner hidden" id="rBanner"><span id="rBannerText"></span><button class="btn small" id="rImages">Load images</button></div>
+  <iframe id="rFrame" class="hidden" title="Email content" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+  <div id="rBody"></div>
+  <div class="r-files hidden" id="rFiles"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const WEBMAIL = new Set(['gmail.com', 'googlemail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'live.com', 'icloud.com', 'proton.me', 'protonmail.com', 'aol.com']);
+const state = {
+  token: sessionStorage.getItem('token'), user: sessionStorage.getItem('user'),
+  messages: [], groups: [], searches: [], mode: 'priority', openAddress: '', learn: null,
+  limit: 100, hasMore: false, lastRange: null, buckets: [], newCount: 0, ctrl: null,
+  resultFolder: '', auto: null, unread: {}, lastLogT: null, editing: null, sg: []
+};
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const domainOf = (addr) => (addr.split('@')[1] || addr || 'unknown');
+const plural = (n, w, pl) => `${n} ${n === 1 ? w : (pl || w + 's')}`;
+// Only touch the page when the content really changed, so open dropdowns and focus are not disturbed
+const setHTML = (el, html) => { if (el._h !== html) { el._h = html; el.innerHTML = html; } };
+const initials = (m) => {
+  const w = (m.name || m.address || '?').replace(/[<>"@._-]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase();
+};
+const hue = (m) => { let h = 0; const t = m.address || m.name || ''; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 360; return h; };
+const ago = (iso) => {
+  if (!iso) return 'not yet';
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+};
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && state.token) signOutLocal();
+  if (!res.ok) throw new Error(data.error || 'Request failed.');
+  return data;
+}
+
+/* ---------- sign in ---------- */
+$('preset').addEventListener('change', (e) => { if (e.target.value) $('host').value = e.target.value; });
+
+$('signin').addEventListener('click', async () => {
+  $('loginError').textContent = '';
+  $('signin').disabled = true;
+  try {
+    const data = await api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ host: $('host').value.trim(), port: $('port').value.trim(), secure: ($('port').value.trim() || '993') === '993', user: $('user').value.trim(), pass: $('pass').value })
+    });
+    state.token = data.token; state.user = data.user;
+    sessionStorage.setItem('token', data.token); sessionStorage.setItem('user', data.user);
+    $('pass').value = '';
+    await enterApp();
+  } catch (err) {
+    $('loginError').textContent = err.message;
+  } finally {
+    $('signin').disabled = false;
+  }
+});
+$('pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('signin').click(); });
+
+function signOutLocal() {
+  state.token = null; sessionStorage.removeItem('token'); sessionStorage.removeItem('user');
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+}
+$('signout').addEventListener('click', async () => {
+  if (state.auto && state.auto.enabled && !confirm('Signing out stops automatic filing until you sign in again. Sign out?')) return;
+  try { await api('/api/logout', { method: 'POST' }); } catch (e) {}
+  signOutLocal();
+});
+
+async function enterApp() {
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('who').textContent = state.user || '';
+  $('auto').checked = localStorage.getItem('auto') === '1';
+  $('markOpen').checked = localStorage.getItem('markOpen') !== '0';
+  $('alerts').checked = localStorage.getItem('alerts') === '1' && 'Notification' in window && Notification.permission === 'granted';
+  state.lastLogT = null;
+  await loadStore();
+  setRange('24h');
+  poll();
+  runSearch();
+}
+$('auto').addEventListener('change', () => localStorage.setItem('auto', $('auto').checked ? '1' : '0'));
+$('markOpen').addEventListener('change', () => localStorage.setItem('markOpen', $('markOpen').checked ? '1' : '0'));
+$('alerts').addEventListener('change', async () => {
+  if ($('alerts').checked) {
+    const ok = 'Notification' in window && (Notification.permission === 'granted' || (await Notification.requestPermission()) === 'granted');
+    if (!ok) { $('alerts').checked = false; $('searchError').textContent = 'Your browser blocked alerts. Allow notifications for this page, then try again.'; }
+  }
+  localStorage.setItem('alerts', $('alerts').checked ? '1' : '0');
+});
+
+/* ---------- saved groups and searches ---------- */
+async function loadStore() {
+  const s = await api('/api/store');
+  state.groups = s.groups; state.searches = s.searches;
+  renderSide();
+}
+async function saveStore() {
+  const s = await api('/api/store', { method: 'PUT', body: JSON.stringify({ groups: state.groups, searches: state.searches }) });
+  state.groups = s.groups; state.searches = s.searches;
+  renderSide();
+  if (state.messages.length) render();
+  poll();
+}
+
+function renderSide() {
+  const badge = (name) => (state.unread[name] ? `<span class="badge" title="Unread">${state.unread[name]}</span>` : '');
+  setHTML($('groupList'), state.groups.length
+    ? state.groups.map((g, i) => {
+        const opts = [g.move ? 'moves out of inbox' : '', g.markRead ? 'marked read' : ''].filter(Boolean).join(', ');
+        return `<div class="item"><div class="top"><strong>${esc(g.name)}${badge(g.name)}</strong><span class="acts"><button class="btn small" data-find-group="${i}">Find</button><button class="btn small" data-edit-group="${i}">Edit</button><button class="btn small danger" data-del-group="${i}">Delete</button></span></div><small>${esc(g.members.join(', ') || 'No members yet')}${opts ? ' · ' + esc(opts) : ''}</small></div>`;
+      }).join('')
+    : '<p class="hint">No groups yet. Create one below, or use a suggestion from your results.</p>');
+  setHTML($('searchList'), state.searches.length
+    ? state.searches.map((s, i) => `<div class="item"><div class="top"><strong>${esc(s.name)}</strong><span class="acts"><button class="btn small" data-run-search="${i}">Run</button><button class="btn small danger" data-del-search="${i}">Delete</button></span></div></div>`).join('')
+    : '<p class="hint">Save the filters you use often and run them in one click.</p>');
+  setHTML($('fromOptions'), state.groups.map((g) => `<option value="${esc(g.name)}">`).join(''));
+
+  const prev = $('folder').value;
+  setHTML($('folder'), '<option value="">Inbox</option>' + state.groups.map((g) => `<option value="${esc(g.name)}">${esc(g.name)} folder${state.unread[g.name] ? ' (' + state.unread[g.name] + ' unread)' : ''}</option>`).join(''));
+  if ([...$('folder').options].some((o) => o.value === prev)) $('folder').value = prev;
+}
+
+$('groupList').addEventListener('click', (e) => {
+  const del = e.target.dataset.delGroup, find = e.target.dataset.findGroup, edit = e.target.dataset.editGroup;
+  if (del !== undefined) { state.groups.splice(Number(del), 1); resetGroupForm(); saveStore(); }
+  if (find !== undefined) { $('from').value = state.groups[Number(find)].name; $('folder').value = ''; runSearch(); }
+  if (edit !== undefined) {
+    const g = state.groups[Number(edit)];
+    state.editing = Number(edit);
+    $('gName').value = g.name; $('gMembers').value = g.members.join(', ');
+    $('gMove').checked = g.move; $('gRead').checked = g.markRead;
+    $('gTitle').textContent = 'Editing group'; $('addGroup').textContent = 'Update group'; $('cancelEdit').classList.remove('hidden');
+    $('gName').focus();
+  }
+});
+
+function resetGroupForm() {
+  state.editing = null;
+  $('gName').value = ''; $('gMembers').value = ''; $('gMove').checked = false; $('gRead').checked = false;
+  $('gTitle').textContent = 'New group name'; $('addGroup').textContent = 'Save group'; $('cancelEdit').classList.add('hidden');
+}
+$('cancelEdit').addEventListener('click', resetGroupForm);
+
+function addGroup(name, members, move = false, markRead = false) {
+  const existing = state.groups.find((g) => g.name.toLowerCase() === name.toLowerCase());
+  if (existing) existing.members = [...new Set([...existing.members, ...members])];
+  else state.groups.push({ name, members, move, markRead });
+  return saveStore();
+}
+$('addGroup').addEventListener('click', () => {
+  const name = $('gName').value.trim();
+  const members = $('gMembers').value.split(',').map((m) => m.trim().toLowerCase()).filter(Boolean);
+  if (!name) return;
+  const move = $('gMove').checked, markRead = $('gRead').checked;
+  if (state.editing !== null) state.groups[state.editing] = { name, members, move, markRead };
+  else if (state.groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+    const g = state.groups.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    g.members = [...new Set([...g.members, ...members])]; g.move = move; g.markRead = markRead;
+  } else state.groups.push({ name, members, move, markRead });
+  resetGroupForm();
+  saveStore();
+});
+
+$('saveSearch').addEventListener('click', () => {
+  const name = $('sName').value.trim();
+  if (!name) return;
+  const entry = {
+    name, from: $('from').value.trim(), q: $('q').value.trim(), folder: $('folder').value, unread: $('unread').checked,
+    range: state.lastRange, since: $('since').value, before: $('before').value
+  };
+  const i = state.searches.findIndex((s) => s.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) state.searches[i] = entry; else state.searches.push(entry);
+  $('sName').value = '';
+  saveStore();
+});
+$('searchList').addEventListener('click', (e) => {
+  const del = e.target.dataset.delSearch, run = e.target.dataset.runSearch;
+  if (del !== undefined) { state.searches.splice(Number(del), 1); saveStore(); }
+  if (run !== undefined) {
+    const s = state.searches[Number(run)];
+    $('from').value = s.from; $('q').value = s.q; $('unread').checked = s.unread;
+    $('folder').value = [...$('folder').options].some((o) => o.value === (s.folder || '')) ? (s.folder || '') : '';
+    if (s.range) setRange(s.range); else { state.lastRange = null; $('since').value = s.since; $('before').value = s.before; }
+    runSearch();
+  }
+});
+
+function matchesMember(msg, member) {
+  const m = member.toLowerCase();
+  if (m.startsWith('@')) return msg.address.endsWith(m);
+  if (!m.includes('@')) return msg.address.endsWith('@' + m) || msg.name.toLowerCase().includes(m);
+  return msg.address === m;
+}
+const groupsOf = (msg) => state.groups.filter((g) => g.members.some((m) => matchesMember(msg, m)));
+
+/* ---------- automatic filing ---------- */
+async function poll() {
+  if (!state.token) return;
+  try {
+    const s = await api('/api/status');
+    state.auto = s.auto; state.unread = s.unread; state.learn = s.learn;
+    renderSide(); renderAuto(); notifyFiled(s.auto.log);
+  } catch (e) { /* status is a nicety; ignore failures */ }
+}
+
+function renderAuto() {
+  const a = state.auto; if (!a) return;
+  $('autoFile').checked = a.enabled;
+  $('autoRun').classList.toggle('hidden', !a.enabled);
+  const noMembers = !state.groups.some((g) => g.members.length);
+  $('autoStatus').innerHTML = a.error
+    ? `<span style="color:var(--danger)">Last check failed: ${esc(a.error)}</span>`
+    : a.enabled
+      ? `<span class="live">On.</span> ` + (a.lastRun ? `Last check ${esc(ago(a.lastRun))}, filed ${a.lastFiled}. ` : 'Waiting for the first check. ') + `${plural(a.totalFiled, 'email')} filed in total.` + (noMembers ? ' Add a group with members to start filing.' : '')
+      : 'Off.';
+  setHTML($('autoLog'), a.log.slice(0, 8).map((e) => `<li>${esc(e.group)}: ${plural(e.count, 'email')} ${e.move ? 'moved' : 'copied'} · ${esc(ago(e.t))}</li>`).join(''));
+}
+
+$('autoFile').addEventListener('change', async () => {
+  const want = $('autoFile').checked;
+  $('searchError').textContent = '';
+  try {
+    await api('/api/auto', { method: 'POST', body: JSON.stringify({ enabled: want }) });
+    await poll();
+  } catch (err) {
+    $('autoFile').checked = !want;
+    $('searchError').textContent = err.message;
+  }
+});
+$('autoRun').addEventListener('click', async () => {
+  $('autoRun').disabled = true;
+  try { await api('/api/auto/run', { method: 'POST' }); await poll(); if ($('auto').checked) runSearch({ silent: true }); }
+  catch (err) { $('searchError').textContent = err.message; }
+  finally { $('autoRun').disabled = false; }
+});
+
+function notifyFiled(log) {
+  const latest = log.length ? log[0].t : '';
+  if (state.lastLogT === null) { state.lastLogT = latest; return; }  // first look: nothing to announce
+  const fresh = log.filter((e) => e.t > state.lastLogT);
+  if (!fresh.length) return;
+  state.lastLogT = latest;
+  if ($('alerts').checked && 'Notification' in window && Notification.permission === 'granted') {
+    const total = fresh.reduce((n, e) => n + e.count, 0);
+    new Notification('Mail organiser', { body: `Filed ${plural(total, 'new email')}: ` + fresh.map((e) => `${e.group} (${e.count})`).join(', ') });
+  }
+}
+
+/* ---------- search ---------- */
+function toLocalInput(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function setRange(kind) {
+  const now = new Date(); let start;
+  if (kind === '1h') start = new Date(now - 3600000);
+  if (kind === '24h') start = new Date(now - 86400000);
+  if (kind === '7d') start = new Date(now - 7 * 86400000);
+  if (kind === 'today') { start = new Date(now); start.setHours(0, 0, 0, 0); }
+  $('since').value = toLocalInput(start); $('before').value = '';
+  state.lastRange = kind;
+}
+// Quick ranges are re-worked each run, so "Last 24 hours" always means the last 24 hours from now
+function refreshRange() { if (state.lastRange) setRange(state.lastRange); }
+
+document.querySelector('.quick').addEventListener('click', (e) => {
+  if (e.target.dataset.range) { setRange(e.target.dataset.range); runSearch(); }
+});
+['since', 'before'].forEach((id) => $(id).addEventListener('input', () => { state.lastRange = null; }));
+$('clear').addEventListener('click', () => { ['from', 'q', 'since', 'before'].forEach((id) => ($(id).value = '')); $('unread').checked = false; $('folder').value = ''; state.lastRange = null; });
+['from', 'q', 'since', 'before'].forEach((id) => $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); }));
+$('folder').addEventListener('change', () => runSearch());
+
+// Turn what was typed into a sender list: group names expand to their members
+function resolveSenders(text) {
+  const senders = []; let emptyGroup = null;
+  text.split(',').map((t) => t.trim()).filter(Boolean).forEach((t) => {
+    const g = state.groups.find((x) => x.name.toLowerCase() === t.toLowerCase());
+    if (!g) senders.push(t);
+    else if (!g.members.length) emptyGroup = g.name;
+    else senders.push(...g.members);
+  });
+  return { senders: [...new Set(senders)], emptyGroup };
+}
+
+async function runSearch({ silent = false, more = false } = {}) {
+  $('searchError').textContent = '';
+  if (!more) state.limit = 100;
+  if (!silent) { refreshRange(); state.newCount = 0; document.title = 'Mail organiser'; }
+  const { senders, emptyGroup } = resolveSenders($('from').value);
+  if (emptyGroup) { $('searchError').textContent = `The group “${emptyGroup}” has no members yet. Add some, then search again.`; return; }
+  if (senders.length > 40) { $('searchError').textContent = 'Too many senders. Search up to 40 at a time.'; return; }
+
+  if (state.ctrl) state.ctrl.abort();
+  const ctrl = state.ctrl = new AbortController();
+  if (!silent) { $('status').textContent = 'Searching…'; $('results').classList.add('loading'); }
+
+  const folder = $('folder').value;
+  const p = new URLSearchParams();
+  senders.forEach((s) => p.append('from', s));
+  if ($('q').value.trim()) p.set('q', $('q').value.trim());
+  if ($('since').value) p.set('since', new Date($('since').value).toISOString());
+  if ($('before').value) p.set('before', new Date($('before').value).toISOString());
+  if ($('unread').checked) p.set('unread', 'true');
+  if (folder) p.set('folder', folder);
+  p.set('limit', state.limit);
+
+  try {
+    const prev = new Set(state.messages.map((m) => m.uid));
+    const data = await api('/api/messages?' + p, { signal: ctrl.signal });
+    if (silent && prev.size && folder === state.resultFolder) {
+      const fresh = data.messages.filter((m) => !prev.has(m.uid) && m.unread).length;
+      if (fresh) { state.newCount += fresh; document.title = `(${state.newCount}) Mail organiser`; }
+    }
+    state.messages = data.messages; state.hasMore = data.hasMore; state.resultFolder = folder;
+    render();
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    $('results').classList.remove('loading');
+    $('status').textContent = '';
+    $('searchError').textContent = err.message;
+  }
+}
+$('search').addEventListener('click', () => runSearch());
+$('more').addEventListener('click', () => { state.limit = Math.min(state.limit + 100, 500); runSearch({ more: true }); });
+window.addEventListener('focus', () => { document.title = 'Mail organiser'; state.newCount = 0; updateStatus(); });
+
+setInterval(() => {
+  if (!state.token || document.hidden) return;
+  poll();
+  if ($('auto').checked && $('reader').classList.contains('hidden')) runSearch({ silent: true });
+}, 60000);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $('reader').classList.add('hidden');
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!state.token) return;
+  if (e.key === '/') { e.preventDefault(); $('from').focus(); }
+  if (e.key === 'r') runSearch();
+});
+
+/* ---------- results ---------- */
+document.querySelector('.toolbar').addEventListener('click', (e) => {
+  const mode = e.target.dataset.mode; if (!mode) return;
+  state.mode = mode;
+  document.querySelectorAll('.toolbar .tab').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.mode === mode)));
+  render();
+});
+
+function buildBuckets() {
+  const msgs = state.messages;
+  if (state.mode === 'priority') {
+    const tiers = [['focus', 'Needs you'], ['updates', 'Worth a look'], ['noise', 'Low priority']];
+    return tiers.map(([key, title]) => ({ key, title, items: msgs.filter((m) => m.tier === key).sort((a, b) => b.score - a.score) })).filter((b) => b.items.length);
+  }
+  if (state.mode === 'list') return [{ title: state.resultFolder ? `${state.resultFolder} folder` : 'All results', items: msgs }];
+  const map = new Map();
+  const add = (key, title, m) => { if (!map.has(key)) map.set(key, { title, items: [] }); map.get(key).items.push(m); };
+  if (state.mode === 'person') msgs.forEach((m) => add(m.address, m.name ? `${m.name} (${m.address})` : m.address || 'Unknown sender', m));
+  if (state.mode === 'org') msgs.forEach((m) => add(domainOf(m.address), domainOf(m.address), m));
+  if (state.mode === 'group') {
+    msgs.forEach((m) => {
+      const gs = groupsOf(m);
+      if (gs.length) gs.forEach((g) => add('g:' + g.name, g.name, m)); else add('~none', 'Ungrouped', m);
+    });
+  }
+  return [...map.values()].sort((a, b) => (a.title === 'Ungrouped') - (b.title === 'Ungrouped') || b.items.length - a.items.length);
+}
+
+// Suggest groups from senders that appear often but aren't in any group yet
+function suggestions() {
+  const orgs = new Map(), people = new Map();
+  state.messages.filter((m) => m.address && !groupsOf(m).length).forEach((m) => {
+    const d = domainOf(m.address);
+    if (!WEBMAIL.has(d)) orgs.set(d, (orgs.get(d) || 0) + 1);
+    else { const e = people.get(m.address) || { n: 0, name: m.name }; e.n++; people.set(m.address, e); }
+  });
+  const out = [];
+  orgs.forEach((n, d) => { if (n >= 3) out.push({ n, label: '@' + d, name: d, members: ['@' + d] }); });
+  people.forEach((e, a) => { if (e.n >= 3) out.push({ n: e.n, label: e.name || a, name: e.name || a, members: [a] }); });
+  return out.sort((a, b) => b.n - a.n).slice(0, 5);
+}
+
+function fmt(iso) {
+  const d = new Date(iso), now = new Date();
+  const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === now.toDateString() ? t : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ', ' + t;
+}
+
+function updateStatus() {
+  const n = state.messages.length, u = state.messages.filter((m) => m.unread).length;
+  $('status').innerHTML = `${plural(n, 'email')}, ${u} unread` + (state.newCount ? ` · <b>${state.newCount} new</b>` : '');
+}
+
+function render() {
+  $('results').classList.remove('loading');
+  updateStatus();
+  const inInbox = state.resultFolder === '';
+  $('fileBtn').classList.toggle('hidden', !(state.mode === 'group' && state.groups.length && state.messages.length && inInbox));
+  $('csvBtn').classList.toggle('hidden', !state.messages.length);
+  $('more').classList.toggle('hidden', !state.hasMore || state.limit >= 500);
+
+  const showPrio = state.mode === 'priority' && state.messages.length > 0;
+  $('prio').classList.toggle('hidden', !showPrio);
+  if (showPrio) {
+    const c = { focus: 0, updates: 0, noise: 0 };
+    state.messages.forEach((m) => { c[m.tier] = (c[m.tier] || 0) + 1; });
+    const L = state.learn;
+    const bits = L ? [L.contacts ? `${plural(L.contacts, 'person', 'people')} you email` : '', L.opened ? `${plural(L.opened, 'sender')} you open` : ''].filter(Boolean) : [];
+    const learned = bits.length ? ` Learning from ${bits.join(' and ')}.` : '';
+    setHTML($('prio'), `<div class="tile hot"><b>${c.focus}</b><span>Needs you</span></div><div class="tile"><b>${c.updates}</b><span>Worth a look</span></div><div class="tile"><b>${c.noise}</b><span>Low priority</span></div><p class="hint">Ranked by who you email, who you open, and how each message looks. Open an email and use “Always important” or “Treat as noise” to teach it.${esc(learned)}</p>`);
+  }
+
+  const sg = inInbox ? suggestions() : [];
+  state.sg = sg;
+  $('suggest').classList.toggle('hidden', !sg.length);
+  $('suggest').innerHTML = sg.length
+    ? 'Suggested groups: ' + sg.map((s, i) => `<button class="chip" data-suggest="${i}">${esc(s.label)} (${s.n})</button>`).join('')
+    : '';
+
+  if (!state.messages.length) { state.buckets = []; $('results').innerHTML = '<div class="empty">No emails match. Widen the date range or loosen the sender.</div>'; return; }
+  state.buckets = buildBuckets();
+  $('results').innerHTML = state.buckets.map((b, i) => {
+    const unread = b.items.filter((m) => m.unread).length;
+    return `<section class="bucket"><header><strong>${esc(b.title)}</strong><span class="meta">${plural(b.items.length, 'email')}${unread ? ', ' + unread + ' unread' : ''}${unread ? `<button class="btn small" data-markread="${i}"${b.key === 'noise' ? ' data-dismiss="1"' : ''}>${b.key === 'noise' ? 'Clear noise' : 'Mark read'}</button>` : ''}</span></header>${b.items.map((m) =>
+      `<button class="msg ${m.unread ? 'unread' : ''}" data-uid="${m.uid}"><span class="avatar" style="--h:${hue(m)}">${esc(initials(m))}</span><span class="text"><span class="from">${esc(m.name || m.address)}</span><span class="subj">${esc(m.subject)}</span>${state.mode === 'priority' && m.why && m.why.length ? `<span class="why">${esc(m.why.join(' · '))}</span>` : ''}</span><span class="when">${esc(fmt(m.date))}</span></button>`).join('')}</section>`;
+  }).join('');
+}
+
+$('suggest').addEventListener('click', (e) => {
+  const s = state.sg[Number(e.target.dataset.suggest)];
+  if (s) addGroup(s.name, s.members);
+});
+
+async function markRead(uids, seen = true) {
+  if (!uids.length) return;
+  await api('/api/flags', { method: 'POST', body: JSON.stringify({ uids, seen, folder: state.resultFolder }) });
+  const set = new Set(uids);
+  state.messages.forEach((m) => { if (set.has(m.uid)) m.unread = !seen; });
+  render();
+  poll();
+}
+
+$('results').addEventListener('click', async (e) => {
+  const mr = e.target.dataset.markread;
+  if (mr !== undefined) {
+    const dismiss = e.target.dataset.dismiss;
+    const unreadMsgs = state.buckets[Number(mr)].items.filter((m) => m.unread);
+    try {
+      await markRead(unreadMsgs.map((m) => m.uid));
+      if (dismiss) {
+        // Clearing a pile of noise tells the ranking you do not want these senders pushed to the top
+        const addresses = [...new Set(unreadMsgs.map((m) => m.address).filter(Boolean))];
+        await api('/api/learn', { method: 'POST', body: JSON.stringify({ event: 'dismiss', addresses }) }).catch(() => {});
+        runSearch({ silent: true });
+      }
+    } catch (err) { $('searchError').textContent = err.message; }
+    return;
+  }
+  const btn = e.target.closest('.msg'); if (!btn) return;
+  const uid = Number(btn.dataset.uid);
+  openMessage(uid);
+});
+
+/* ---------- the reader ---------- */
+const bytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+
+// Plain-text mail: turn long tracking links into short labels (the site name) that still open the real address
+function linkify(text) {
+  const link = (u) => {
+    let host = '';
+    try { host = new URL(u.replace(/&amp;/g, '&')).hostname.replace(/^www\./, ''); } catch (e) { /* not a valid address */ }
+    return `<a class="lnk" href="${u}" target="_blank" rel="noopener noreferrer" title="${u.slice(0, 120)}">${esc(host || 'link')} ↗</a>`;
+  };
+  return esc(text).replace(/\r/g, '')
+    .replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, u) => link(u))
+    .replace(/(^|[\s(])(https?:\/\/[^\s<>")\]]+)/g, (m, pre, u) => pre + link(u))
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// HTML mail is shown in a locked frame: no scripts, nothing loads from the internet unless you allow images
+function buildDoc(html, images) {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:${images ? ' https: http:' : ''}; style-src 'unsafe-inline'; font-src data:"><base target="_blank"><style>
+html{background:#fff}body{margin:0;padding:20px;font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1a1a1a;overflow-wrap:anywhere}
+img{max-width:100%;height:auto}table{max-width:100%}a{color:#c2410c}pre{white-space:pre-wrap}blockquote{margin:0;padding-left:12px;border-left:3px solid #ddd;color:#555}</style></head><body>${html}</body></html>`;
+}
+
+function fitFrame() {
+  const f = $('rFrame');
+  try {
+    const doc = f.contentDocument;
+    if (!doc || !doc.body) return;
+    const fit = () => { f.style.height = Math.max(160, doc.documentElement.scrollHeight) + 'px'; };
+    fit();
+    doc.querySelectorAll('img').forEach((i) => i.addEventListener('load', fit));
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(doc.body);
+  } catch (e) { f.style.height = '70vh'; }
+}
+$('rFrame').addEventListener('load', fitFrame);
+
+function resetReader() {
+  state.msg = null; state.openAddress = ''; state.imagesOn = false; state.view = 'text';
+  ['rActions', 'rBanner', 'rFrame', 'rView', 'rFiles'].forEach((id) => $(id).classList.add('hidden'));
+  $('rSubject').textContent = ''; $('rFrom').textContent = ''; $('rMeta').textContent = ''; $('rAvatar').textContent = '';
+  $('rBody').textContent = ''; $('rBody').classList.remove('hidden'); $('rNote').textContent = ''; $('rFiles').innerHTML = '';
+  $('rFrame').removeAttribute('srcdoc');
+}
+
+function showBody() {
+  const m = state.msg; if (!m) return;
+  const hasHtml = !!m.html;
+  const formatted = hasHtml && state.view === 'formatted';
+  $('rView').classList.toggle('hidden', !hasHtml);
+  document.querySelectorAll('#rView .tab').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.view === (formatted ? 'formatted' : 'text'))));
+  $('rFrame').classList.toggle('hidden', !formatted);
+  $('rBody').classList.toggle('hidden', formatted);
+  $('rBody').innerHTML = linkify(m.text || '(No plain-text version of this email.)');
+  const blocked = formatted && m.remoteImages > 0 && !state.imagesOn;
+  $('rBanner').classList.toggle('hidden', !blocked);
+  $('rBannerText').textContent = `${plural(m.remoteImages, 'image')} blocked to protect your privacy. Senders can use images to see that you opened an email.`;
+  if (formatted) {
+    const withImages = state.imagesOn && !!m.htmlImages;
+    $('rFrame').setAttribute('srcdoc', buildDoc(withImages ? m.htmlImages : m.html, withImages));
+  }
+}
+
+async function openMessage(uid) {
+  $('reader').classList.remove('hidden');
+  resetReader();
+  $('rSubject').textContent = 'Loading…';
+  try {
+    const m = await api(`/api/message/${uid}?folder=${encodeURIComponent(state.resultFolder)}`);
+    m.uid = uid;
+    state.msg = m; state.view = m.html ? 'formatted' : 'text'; state.imagesOn = false;
+    $('rSubject').textContent = m.subject;
+    $('rFrom').textContent = m.fromName || m.address || m.from;
+    $('rAvatar').textContent = initials({ name: m.fromName, address: m.address });
+    $('rAvatar').style.setProperty('--h', hue({ name: m.fromName, address: m.address }));
+    $('rMeta').textContent = [m.fromName && m.address ? m.address : '', m.to ? `To ${m.to}` : '', m.date ? new Date(m.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : ''].filter(Boolean).join(' · ');
+    state.openAddress = m.address || '';
+    $('rActions').classList.toggle('hidden', !state.openAddress);
+    $('rFiles').innerHTML = (m.files || []).map((f) => `<button class="file" data-file="${f.index}" data-name="${esc(f.name)}"><svg class="i" viewBox="0 0 24 24"><path d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L14 7.5"/></svg><span>${esc(f.name)}</span><small>${bytes(f.size)}</small></button>`).join('');
+    $('rFiles').classList.toggle('hidden', !(m.files && m.files.length));
+    showBody();
+    const msg = state.messages.find((x) => x.uid === uid);
+    if ($('markOpen').checked && msg && msg.unread) markRead([uid]).catch(() => {});
+  } catch (err) { $('rSubject').textContent = 'Could not open this email'; $('rBody').textContent = err.message; }
+}
+
+$('rView').addEventListener('click', (e) => { if (e.target.dataset.view) { state.view = e.target.dataset.view; showBody(); } });
+$('rImages').addEventListener('click', () => { state.imagesOn = true; showBody(); });
+$('rFiles').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-file]'); if (!b || !state.msg) return;
+  b.disabled = true;
+  try {
+    const res = await fetch(`/api/attachment/${state.msg.uid}/${b.dataset.file}?folder=${encodeURIComponent(state.resultFolder)}`, { headers: { Authorization: 'Bearer ' + state.token } });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Download failed.');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob()); a.download = b.dataset.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (err) { $('rActions').classList.remove('hidden'); $('rNote').textContent = err.message; }
+  finally { b.disabled = false; }
+});
+
+async function teach(event, note) {
+  if (!state.openAddress) return;
+  try {
+    await api('/api/learn', { method: 'POST', body: JSON.stringify({ event, addresses: [state.openAddress] }) });
+    $('rNote').textContent = note;
+    runSearch({ silent: true });
+    poll();
+  } catch (err) { $('rNote').textContent = err.message; }
+}
+$('rImportant').addEventListener('click', () => teach('important', 'Done. Their mail will rank near the top.'));
+$('rNoise').addEventListener('click', () => teach('noise', 'Done. Their mail will go to Low priority.'));
+
+$('closeReader').addEventListener('click', () => $('reader').classList.add('hidden'));
+
+// Copy (or move, for groups set to move) the emails on screen into Groups/<name> folders
+$('fileBtn').addEventListener('click', async () => {
+  const items = state.groups
+    .map((g) => ({ group: g.name, move: g.move, markRead: g.markRead, uids: state.messages.filter((m) => g.members.some((x) => matchesMember(m, x))).map((m) => m.uid) }))
+    .filter((i) => i.uids.length);
+  if (!items.length) { $('searchError').textContent = 'None of these emails belong to a group yet.'; return; }
+  const total = items.reduce((n, i) => n + i.uids.length, 0);
+  const movers = items.filter((i) => i.move).map((i) => i.group);
+  if (!confirm(`File ${plural(total, 'email')} into ${plural(items.length, 'folder')} named Groups/… in your mailbox?\n\n` +
+    (movers.length ? `These groups take mail out of your inbox: ${movers.join(', ')}.\n` : 'Nothing is deleted or moved out of your inbox.\n') +
+    'Emails already filed are skipped.')) return;
+  $('fileBtn').disabled = true;
+  $('searchError').textContent = '';
+  try {
+    const { results } = await api('/api/organise', { method: 'POST', body: JSON.stringify({ items }) });
+    const filed = results.reduce((n, r) => n + r.filed, 0), skipped = results.reduce((n, r) => n + r.skipped, 0);
+    $('status').textContent = `Filed ${plural(filed, 'email')}` + (skipped ? `, skipped ${skipped} already filed` : '');
+    poll();
+    if (movers.length) runSearch({ silent: true });
+  } catch (err) {
+    $('searchError').textContent = err.message;
+  } finally {
+    $('fileBtn').disabled = false;
+  }
+});
+
+// Download what is on screen as a spreadsheet-friendly CSV
+function csvCell(v) {
+  let s = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // stops spreadsheets running text as a formula
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+$('csvBtn').addEventListener('click', () => {
+  const tierName = { focus: 'Needs you', updates: 'Worth a look', noise: 'Low priority' };
+  const rows = [['Date', 'From name', 'From address', 'Subject', 'Unread', 'Priority', 'Groups']].concat(
+    state.messages.map((m) => [new Date(m.date).toLocaleString(), m.name, m.address, m.subject, m.unread ? 'yes' : 'no', tierName[m.tier] || '', groupsOf(m).map((g) => g.name).join('; ')]));
+  const blob = new Blob(['\ufeff' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `emails-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+if (state.token) enterApp().catch(signOutLocal);
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+{
+  "groups": [
+    {
+      "name": "accounts.google.com",
+      "members": [
+        "@accounts.google.com"
+      ],
+      "move": false,
+      "markRead": false
+    },
+    {
+      "name": "toritradez.com",
+      "members": [
+        "@toritradez.com"
+      ],
+      "move": false,
+      "markRead": false
+    }
+  ],
+  "searches": [],
+  "filed": {
+    "uidValidity": "",
+    "groups": {}
+  },
+  "auto": {
+    "enabled": false,
+    "lastUid": 0,
+    "uidValidity": "",
+    "totalFiled": 0
+  },
+  "log": [],
+  "learn": {
+    "sent": {
+      "scholaralerts-noreply@google.com": 1,
+      "lilslugger7@bellsouth.net": 1,
+      "sms@telegram.org": 3,
+      "jamad@longhaulmgmt.com": 2,
+      "hurairaa.xx@gmail.com": 1,
+      "ghanascholarshipsecretariat@yahoo.com": 3,
+      "elizabeth.hardin@wgu.edu": 1,
+      "info@scholarshipowl.com": 1,
+      "lucy.miller@berlinsbi.com": 1,
+      "noreply@berlinsbi.com": 1,
+      "customercare@calbank.net": 6,
+      "cheggstudy.appsupport@chegg.com": 1,
+      "support@exness.com": 1,
+      "tracy.appiah02@gmail.com": 1,
+      "noreply@youtube.com": 1,
+      "essay.portal@elevated.school": 1,
+      "assist@ecobank.com": 1,
+      "nyarkorichardkwasi@gmail.com": 1,
+      "intl@cs.epwk.com": 2,
+      "csm297.260@gmail.com": 1,
+      "support@paystack.com": 1
+    },
+    "sentAt": 1794815554274,
+    "opens": {
+      "no-reply@e.udemymail.com": 1,
+      "scholaralerts-noreply@google.com": 2,
+      "support@educative.io": 1,
+      "program-support@aspireleaders.org": 1
+    },
+    "dismissed": {},
+    "important": {},
+    "muted": {}
+  }
+}
